@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>跨国多人旅行记账（固定汇率，可添加币种 + 备注）</title>
+<style>
+body { font-family: Arial; margin: 20px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+button { margin-top: 10px; padding: 5px 10px; }
+input, select { width: 100%; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<h2>跨国多人旅行记账（固定汇率，可添加币种 + 备注）</h2>
+
+<!-- 添加新币种 -->
+<div style="margin-bottom:10px;">
+    <label>添加币种：</label>
+    <input type="text" id="newCurrency" placeholder="币种代码，如 THB">
+    <input type="number" id="newRate" placeholder="汇率（1币种=多少CNY）" step="0.0001">
+    <button onclick="addCurrency()">添加币种</button>
+</div>
+
+<table id="expenseTable">
+<tr>
+<th>日期</th><th>项目</th><th>金额</th><th>币种</th><th>付款人</th><th>备注</th>
+</tr>
+</table>
+<button onclick="addRow()">添加记录</button>
+<button onclick="calculate()">计算分摊</button>
+<div id="result"></div>
+
+<script>
+// 固定汇率表（基准货币 CNY）
+let rates = {
+    "CNY": 1,
+    "USD": 7.25,
+    "EUR": 7.90,
+    "JPY": 0.052,
+    "GBP": 9.10,
+    "AUD": 4.70
+};
+
+// 添加新币种
+function addCurrency() {
+    let cur = document.getElementById("newCurrency").value.trim().toUpperCase();
+    let rate = parseFloat(document.getElementById("newRate").value);
+    if (!cur || isNaN(rate) || rate <= 0) {
+        alert("请输入有效的币种代码和汇率");
+        return;
+    }
+    rates[cur] = rate;
+    alert(`已添加币种 ${cur}，汇率为 ${rate}`);
+    document.getElementById("newCurrency").value = "";
+    document.getElementById("newRate").value = "";
+}
+
+// 添加新行
+function addRow() {
+    const table = document.getElementById("expenseTable");
+    const row = table.insertRow();
+    let dateInput = document.createElement("input");
+    dateInput.type = "date";
+    row.insertCell().appendChild(dateInput);
+
+    row.insertCell().appendChild(document.createElement("input")); // 项目
+
+    let amountInput = document.createElement("input");
+    amountInput.type = "number"; amountInput.step = "0.01";
+    row.insertCell().appendChild(amountInput);
+
+    let currencySelect = document.createElement("select");
+    Object.keys(rates).forEach(cur=>{
+        let opt = document.createElement("option");
+        opt.value = cur; opt.text = cur;
+        currencySelect.appendChild(opt);
+    });
+    row.insertCell().appendChild(currencySelect);
+
+    row.insertCell().appendChild(document.createElement("input")); // 付款人
+    row.insertCell().appendChild(document.createElement("input")); // 备注
+}
+
+// 计算分摊
+function calculate() {
+    let expenses = [];
+    const table = document.getElementById("expenseTable");
+    for (let i = 1; i < table.rows.length; i++) {
+        let cells = table.rows[i].cells;
+        expenses.push({
+            date: cells[0].children[0].value,
+            item: cells[1].children[0].value,
+            amount: parseFloat(cells[2].children[0].value) || 0,
+            currency: cells[3].children[0].value,
+            payer: cells[4].children[0].value,
+            note: cells[5].children[0].value
+        });
+    }
+    let totalCNY = expenses.reduce((sum, e) => sum + e.amount * (rates[e.currency] || 1), 0);
+    let people = [...new Set(expenses.map(e => e.payer))];
+    let perPerson = totalCNY / people.length;
+    let summary = people.map(p => {
+        let paidCNY = expenses.filter(e => e.payer === p)
+                              .reduce((sum, e) => sum + e.amount * (rates[e.currency] || 1), 0);
+        return `${p} 已付 ${paidCNY.toFixed(2)} 元，应付 ${perPerson.toFixed(2)} 元，差额 ${(paidCNY - perPerson).toFixed(2)} 元`;
+    }).join("<br>");
+    
+    let notes = expenses.map(e => `${e.date} - ${e.item} (${e.currency} ${e.amount}) by ${e.payer} | 备注: ${e.note}`).join("<br>");
+    
+    document.getElementById("result").innerHTML = `总支出：${totalCNY.toFixed(2)} 元<br>${summary}<br><br><b>消费明细:</b><br>${notes}`;
+}
+</script>
+</body>
+</html>
+
+
